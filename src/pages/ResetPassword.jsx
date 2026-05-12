@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Lock, Eye, EyeOff, Shield, Check } from 'lucide-react'
-import { updatePassword, verifyResetToken } from '../lib/auth'
+import { updatePassword } from '../lib/auth'
+import { supabase } from '../lib/supabaseClient' // adjust path if different
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -14,21 +15,37 @@ export default function ResetPassword() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [tokenError, setTokenError] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false) // NEW
 
-  // Extract token from URL on component mount
   useEffect(() => {
-    const token = searchParams.get('token')
-    if (!token) {
-      setTokenError(true)
-      setError('No reset token found. The link may have expired.')
+    const exchangeCode = async () => {
+      const code = searchParams.get('code') // ✅ Supabase v2 sends 'code', not 'token'
+
+      if (!code) {
+        setTokenError(true)
+        setError('No reset token found. The link may have expired.')
+        return
+      }
+
+      // ✅ Must exchange the code for a session first
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+
+      if (exchangeError) {
+        setTokenError(true)
+        setError('Reset link is invalid or has expired. Please request a new one.')
+        return
+      }
+
+      setSessionReady(true) // ✅ Session ready, show the form
     }
+
+    exchangeCode()
   }, [searchParams])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
 
-    // Validation
     if (!newPassword || !confirmPassword) {
       setError('Please fill in all fields')
       return
@@ -46,18 +63,13 @@ export default function ResetPassword() {
 
     setLoading(true)
 
-    // Call Supabase to update the password
-    // The user has a valid session from the reset email token
     const { error: updateError } = await updatePassword(newPassword)
 
     if (updateError) {
       setError(updateError.message || 'Failed to update password. Please try again.')
     } else {
       setSuccess(true)
-      // Redirect to login after 2 seconds
-      setTimeout(() => {
-        navigate('/login')
-      }, 2000)
+      setTimeout(() => navigate('/login'), 2000)
     }
 
     setLoading(false)
@@ -91,33 +103,33 @@ export default function ResetPassword() {
               </button>
             </>
           ) : success ? (
-            <>
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-green-500/10 border border-green-500/30 rounded-full mb-4">
-                  <Check className="w-6 h-6 text-green-400" />
-                </div>
-                <h2 className="text-xl font-semibold text-white mb-2">Password updated!</h2>
-                <p className="text-gray-400 text-sm mb-6">
-                  Your password has been successfully reset. Redirecting to login...
-                </p>
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-green-500/10 border border-green-500/30 rounded-full mb-4">
+                <Check className="w-6 h-6 text-green-400" />
               </div>
-            </>
+              <h2 className="text-xl font-semibold text-white mb-2">Password updated!</h2>
+              <p className="text-gray-400 text-sm mb-6">
+                Your password has been successfully reset. Redirecting to login...
+              </p>
+            </div>
+          ) : !sessionReady ? (
+            // ✅ Show loading while exchanging the code
+            <div className="text-center py-4">
+              <p className="text-gray-400 text-sm">Verifying reset link...</p>
+            </div>
           ) : (
             <>
               <h2 className="text-xl font-semibold text-white mb-6">
                 Create a new password
               </h2>
 
-              {/* Error message */}
               {error && (
                 <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg mb-4 text-sm">
                   {error}
                 </div>
               )}
 
-              {/* Form */}
               <form onSubmit={handleSubmit}>
-                {/* New password field */}
                 <div className="mb-4">
                   <label className="text-gray-400 text-sm mb-1 block">New password</label>
                   <div className="relative">
@@ -139,7 +151,6 @@ export default function ResetPassword() {
                   </div>
                 </div>
 
-                {/* Confirm password field */}
                 <div className="mb-6">
                   <label className="text-gray-400 text-sm mb-1 block">Confirm password</label>
                   <div className="relative">
@@ -161,7 +172,6 @@ export default function ResetPassword() {
                   </div>
                 </div>
 
-                {/* Submit button */}
                 <button
                   type="submit"
                   disabled={loading}
