@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Lock, Eye, EyeOff, Shield, Check } from 'lucide-react'
-import { updatePassword } from '../lib/auth'
-import { supabase } from '../lib/supabaseClient' // adjust path if different
+import { updatePassword, verifyResetToken } from '../lib/auth'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -18,28 +17,27 @@ export default function ResetPassword() {
   const [sessionReady, setSessionReady] = useState(false) // NEW
 
   useEffect(() => {
-    const exchangeCode = async () => {
-      const code = searchParams.get('code') // ✅ Supabase v2 sends 'code', not 'token'
+    const verifyToken = async () => {
+      const token = searchParams.get('token')
 
-      if (!code) {
+      if (!token) {
         setTokenError(true)
         setError('No reset token found. The link may have expired.')
         return
       }
 
-      // ✅ Must exchange the code for a session first
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+      const { session, error: verifyError } = await verifyResetToken(token)
 
-      if (exchangeError) {
+      if (verifyError || !session) {
         setTokenError(true)
         setError('Reset link is invalid or has expired. Please request a new one.')
         return
       }
 
-      setSessionReady(true) // ✅ Session ready, show the form
+      setSessionReady(true)
     }
 
-    exchangeCode()
+    verifyToken()
   }, [searchParams])
 
   const handleSubmit = async (e) => {

@@ -25,7 +25,7 @@ export default function ForgotPassword() {
     // Get the reset redirect URL - adjust this to match your deployed domain
     // For local development, use localhost:5173
     // For production on Vercel, use your actual domain
-    const resetUrl = `${window.location.origin}/reset-password`
+    const resetUrl = 'https://password-manager-brown-theta.vercel.app/reset-password'
 
     const { error: resetError } = await sendPasswordResetEmail(email, resetUrl)
 
