@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Lock, Mail, Eye, EyeOff, Shield } from 'lucide-react'
 
@@ -95,7 +95,17 @@ export default function Login() {
 
           {/* Password field */}
           <div className="mb-6">
-            <label className="text-gray-400 text-sm mb-1 block">Password</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-gray-400 text-sm block">Password</label>
+              {!isSignUp && (
+                <Link
+                  to="/forgot-password"
+                  className="text-indigo-400 hover:text-indigo-300 text-xs font-medium"
+                >
+                  Forgot password?
+                </Link>
+              )}
+            </div>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input

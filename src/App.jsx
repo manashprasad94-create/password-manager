@@ -3,6 +3,8 @@ import Login from './pages/Login'
 import PinVerify from './pages/PinVerify'
 import Dashboard from './pages/Dashboard'
 import AddPassword from './components/AddPassword'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 
 function App() {
   return (
@@ -10,6 +12,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pin" element={<PinVerify />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/add" element={<AddPassword />} />
