@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Lock, Eye, EyeOff, Shield, Check } from 'lucide-react'
 import { updatePassword, verifyResetToken } from '../lib/auth'
+import { updatePassword } from '../lib/auth'
+import { supabase } from '../lib/supabase'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -17,28 +19,38 @@ export default function ResetPassword() {
   const [sessionReady, setSessionReady] = useState(false) // NEW
 
   useEffect(() => {
-    const verifyToken = async () => {
-      const token = searchParams.get('token')
+  const verifyToken = async () => {
+    // ✅ Read from hash fragment, not query params
+    const hash = window.location.hash
+    const params = new URLSearchParams(hash.substring(1)) // remove the '#'
+    
+    const accessToken = params.get('access_token')
+    const refreshToken = params.get('refresh_token')
+    const type = params.get('type')
 
-      if (!token) {
-        setTokenError(true)
-        setError('No reset token found. The link may have expired.')
-        return
-      }
-
-      const { session, error: verifyError } = await verifyResetToken(token)
-
-      if (verifyError || !session) {
-        setTokenError(true)
-        setError('Reset link is invalid or has expired. Please request a new one.')
-        return
-      }
-
-      setSessionReady(true)
+    if (!accessToken || type !== 'recovery') {
+      setTokenError(true)
+      setError('No reset token found. The link may have expired.')
+      return
     }
 
-    verifyToken()
-  }, [searchParams])
+    // ✅ Set the session manually using the tokens from the hash
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    })
+
+    if (sessionError) {
+      setTokenError(true)
+      setError('Reset link is invalid or has expired. Please request a new one.')
+      return
+    }
+
+    setSessionReady(true)
+  }
+
+  verifyToken()
+}, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
