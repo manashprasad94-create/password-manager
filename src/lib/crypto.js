@@ -1,54 +1,43 @@
-import { supabase } from './supabase'
+import CryptoJS from 'crypto-js'
 
-/**
- * Send a password reset email to the user
- */
-export async function sendPasswordResetEmail(email, redirectUrl) {
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
-    })
-    return { error }
-  } catch (error) {
-    return { error }
+// Derive a strong encryption key from the user's PIN
+// PBKDF2 stretches a short PIN into a strong 256-bit key
+export function deriveKey(pin) {
+  const salt = 'keyvault-salt-v1' // fixed salt for consistency
+  return CryptoJS.PBKDF2(pin, salt, {
+    keySize: 256 / 32,
+    iterations: 10000,
+  }).toString()
+}
+
+// Encrypt a password using AES-256
+// Returns: { ciphertext, iv }
+export function encryptPassword(plainText, pin) {
+  const key = deriveKey(pin)
+  const iv = CryptoJS.lib.WordArray.random(16).toString() // random IV every time
+  const encrypted = CryptoJS.AES.encrypt(plainText, key, {
+    iv: CryptoJS.enc.Hex.parse(iv),
+    mode: CryptoJS.mode.CBC,
+    padding: CryptoJS.pad.Pkcs7,
+  })
+  return {
+    ciphertext: encrypted.toString(),
+    iv: iv,
   }
 }
 
-/**
- * Update the user's password (called after they submit the reset form)
- */
-export async function updatePassword(newPassword) {
+// Decrypt a password using AES-256
+// Returns: plain text string
+export function decryptPassword(ciphertext, iv, pin) {
   try {
-    const { data, error } = await supabase.auth.updateUser({
-      password: newPassword,
+    const key = deriveKey(pin)
+    const decrypted = CryptoJS.AES.decrypt(ciphertext, key, {
+      iv: CryptoJS.enc.Hex.parse(iv),
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7,
     })
-    return { user: data?.user || null, error }
-  } catch (error) {
-    return { user: null, error }
-  }
-}
-
-/**
- * Exchange a reset token for a session
- * Works with both ?token= and ?code= URL formats from Supabase
- */
-export async function verifyResetToken(token) {
-  try {
-    // First try exchangeCodeForSession — works with both token flows
-    const { data, error } = await supabase.auth.exchangeCodeForSession(token)
-
-    if (!error && data?.session) {
-      return { session: data.session, error: null }
-    }
-
-    // Fallback: try verifyOtp with token_hash
-    const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-      token_hash: token,
-      type: 'recovery',
-    })
-
-    return { session: otpData?.session || null, error: otpError }
-  } catch (error) {
-    return { session: null, error }
+    return decrypted.toString(CryptoJS.enc.Utf8)
+  } catch {
+    return null // wrong PIN or corrupted data
   }
 }
